@@ -9,20 +9,31 @@ import numpy as np
 
 
 def load_training_logs(output_dir: str) -> List[Dict]:
-    """Load training logs from trainer_state.json or log files."""
+    """Load training logs from various sources."""
     logs = []
+    log_dir = Path(output_dir)
 
-    # Try to load from trainer_state.json
-    trainer_state_path = Path(output_dir) / "trainer_state.json"
-    if trainer_state_path.exists():
-        with open(trainer_state_path, "r") as f:
-            state = json.load(f)
-            if "log_history" in state:
-                logs = state["log_history"]
+    # Try to load from training_logs.json (our custom callback)
+    training_logs_path = log_dir / "training_logs.json"
+    if training_logs_path.exists():
+        with open(training_logs_path, "r") as f:
+            data = json.load(f)
+            if "log_history" in data:
+                logs = data["log_history"]
+                print(f"Loaded {len(logs)} log entries from training_logs.json")
 
-    # If no logs found, try loading from tensorboard logs
+    # Fall back to trainer_state.json (HuggingFace format)
     if not logs:
-        log_dir = Path(output_dir)
+        trainer_state_path = log_dir / "trainer_state.json"
+        if trainer_state_path.exists():
+            with open(trainer_state_path, "r") as f:
+                state = json.load(f)
+                if "log_history" in state:
+                    logs = state["log_history"]
+                    print(f"Loaded {len(logs)} log entries from trainer_state.json")
+
+    # If still no logs, check for tensorboard
+    if not logs:
         for log_file in log_dir.glob("**/events.out.tfevents.*"):
             print(f"Found TensorBoard log: {log_file}")
             print("Use TensorBoard to view: tensorboard --logdir", output_dir)

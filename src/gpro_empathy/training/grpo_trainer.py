@@ -1,11 +1,38 @@
 import unsloth
 import torch
+import json
+import os
 from unsloth import FastLanguageModel
 from trl import GRPOConfig, GRPOTrainer
+from transformers import TrainerCallback
 from typing import List, Callable, Dict, Any, Optional
 
 from ..data.dataset_loader import load_wassa_empathy
 from ..models.reward_functions import semantic_sts_reward, empathy_model_reward
+
+
+class LoggingCallback(TrainerCallback):
+    """Callback to capture and save training logs for plotting."""
+
+    def __init__(self, output_dir: str):
+        self.output_dir = output_dir
+        self.logs = []
+
+    def on_log(self, args, state, control, logs=None, **kwargs):
+        if logs is not None:
+            log_entry = {"step": state.global_step, **logs}
+            self.logs.append(log_entry)
+
+    def on_train_end(self, args, state, control, **kwargs):
+        self.save_logs()
+
+    def save_logs(self):
+        """Save collected logs to JSON file."""
+        os.makedirs(self.output_dir, exist_ok=True)
+        log_path = os.path.join(self.output_dir, "training_logs.json")
+        with open(log_path, "w") as f:
+            json.dump({"log_history": self.logs}, f, indent=2)
+        print(f"Training logs saved to: {log_path}")
 
 
 class GPROEmpathyTrainer:
@@ -53,6 +80,8 @@ class GPROEmpathyTrainer:
         )
 
         self.trainer = None
+        self.output_dir = None
+        self.logging_callback = None
 
     def setup_training(
         self,
@@ -103,12 +132,17 @@ class GPROEmpathyTrainer:
         # Load dataset
         dataset = load_wassa_empathy()
 
+        # Store output_dir and create logging callback
+        self.output_dir = output_dir
+        self.logging_callback = LoggingCallback(output_dir)
+
         self.trainer = GRPOTrainer(
             model=self.model,
             processing_class=self.tokenizer,
             reward_funcs=reward_funcs,
             args=training_args,
             train_dataset=dataset,
+            callbacks=[self.logging_callback],
         )
 
     def train(self):
