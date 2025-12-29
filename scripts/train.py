@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Main training script for GPRO Empathy model.
+Main training script for GRPO Empathy model.
 """
 import argparse
 import yaml
@@ -12,6 +12,7 @@ import sys
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from gpro_empathy.training.grpo_trainer import GPROEmpathyTrainer
+from gpro_empathy.utils.plotting import plot_from_output_dir, plot_reward_distribution, extract_metrics, load_training_logs
 
 
 def load_config(config_path: str) -> dict:
@@ -43,7 +44,18 @@ def main():
         type=int,
         help="Override save steps from config"
     )
-    
+    parser.add_argument(
+        "--plot",
+        action="store_true",
+        default=True,
+        help="Generate training plots after training (default: True)"
+    )
+    parser.add_argument(
+        "--no-plot",
+        action="store_true",
+        help="Disable training plots"
+    )
+
     args = parser.parse_args()
     
     # Load configuration
@@ -138,6 +150,27 @@ def main():
     output2 = trainer.generate_sample(test_prompt, lora_request=lora_req)
     print(output2[:500])
     
+    # Generate training plots
+    if args.plot and not args.no_plot:
+        print("\n=== Generating Training Plots ===")
+        try:
+            output_dir = config['training']['output_dir']
+
+            # Plot main metrics
+            plot_path = os.path.join(output_dir, "training_metrics.png")
+            plot_from_output_dir(output_dir, save_path=plot_path, show=False)
+
+            # Plot reward distributions
+            logs = load_training_logs(output_dir)
+            if logs:
+                metrics = extract_metrics(logs)
+                dist_path = os.path.join(output_dir, "reward_distributions.png")
+                plot_reward_distribution(metrics, save_path=dist_path, show=False)
+
+            print(f"Training plots saved to: {output_dir}")
+        except Exception as e:
+            print(f"Warning: Could not generate plots: {e}")
+
     print(f"\n=== Training completed successfully! ===")
     print(f"LoRA adapter saved to: {lora_path}")
     print(f"Training outputs in: {config['training']['output_dir']}")
