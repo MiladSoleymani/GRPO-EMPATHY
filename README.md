@@ -1,4 +1,4 @@
-# GPRO Empathy: Group Relative Policy Optimization for Empathy Training
+# GRPO Empathy: Group Relative Policy Optimization for Empathy Training
 
 A structured project for training empathetic language models using Group Relative Policy Optimization (GRPO) with specialized reward functions for empathy and semantic similarity.
 
@@ -18,7 +18,7 @@ GPRO-EMPATHY/
 │   ├── models/                 # Reward functions
 │   ├── training/               # GRPO trainer
 │   └── utils/                  # Inference utilities
-├── scripts/                    # Training and inference scripts
+├── scripts/                    # Training, inference, and preview scripts
 ├── configs/                    # Configuration files
 ├── notebooks/                  # Original development notebooks
 └── requirements.txt            # Dependencies
@@ -28,8 +28,8 @@ GPRO-EMPATHY/
 
 1. Clone the repository:
 ```bash
-git clone <repository-url>
-cd GPRO-EMPATHY
+git clone https://github.com/MiladSoleymani/GRPO-EMPATHY.git
+cd GRPO-EMPATHY
 ```
 
 2. Install dependencies:
@@ -132,10 +132,10 @@ MIT License - see LICENSE file for details.
 If you use this work, please cite:
 
 ```bibtex
-@misc{gpro-empathy,
-  title={GPRO Empathy: Group Relative Policy Optimization for Empathy Training},
+@misc{grpo-empathy,
+  title={GRPO Empathy: Group Relative Policy Optimization for Empathy Training},
   author={Milad Soleymani},
   year={2024},
-  url={https://github.com/yourusername/gpro-empathy}
+  url={https://github.com/MiladSoleymani/GRPO-EMPATHY}
 }
 ```
