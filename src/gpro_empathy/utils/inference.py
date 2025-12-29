@@ -52,13 +52,13 @@ class EmpathyInference:
         if include_system:
             messages = [
                 {"role": "system", "content": get_system_prompt()},
-                {"role": "user", "content": f"Here is the dialogue so far. Continue as <|assistant|>.\n\n<|user|>\n{user_message}\n</s>\n"},
+                {"role": "user", "content": user_message},
             ]
         else:
             messages = [
                 {"role": "user", "content": user_message}
             ]
-        
+
         return self.trainer.tokenizer.apply_chat_template(
             messages,
             tokenize=False,

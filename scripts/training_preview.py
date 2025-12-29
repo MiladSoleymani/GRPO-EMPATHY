@@ -69,9 +69,7 @@ def show_training_preview(config):
         print(f"\n--- Sample {i+1} ---")
         print("🎯 Input (User Message):")
         user_content = sample["prompt"][-1]["content"]
-        # Extract just the user utterance for cleaner display
-        user_msg = user_content.split("<|user|>")[-1].split("</s>")[0].strip()
-        print(f"   {user_msg}")
+        print(f"   {user_content}")
         print("🤖 Model Task: Generate reasoning + empathetic response")
 
     # Generate responses
@@ -117,10 +115,9 @@ def show_training_preview(config):
             for i in range(len(samples)):
                 sample = samples[i]
                 user_content = sample["prompt"][-1]["content"]
-                user_msg = user_content.split("<|user|>")[-1].split("</s>")[0].strip()
 
                 print(f"\n--- Sample {i+1} Scores ---")
-                print(f"🎯 Input: {user_msg}")
+                print(f"🎯 Input: {user_content}")
                 print(
                     f"🤖 Response: {completions[i]}{'...' if len(completions[i]) > 100 else ''}"
                 )

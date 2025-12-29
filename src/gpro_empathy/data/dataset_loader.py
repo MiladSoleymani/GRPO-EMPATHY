@@ -2,15 +2,13 @@ from typing import Optional
 from datasets import load_dataset, Dataset
 
 
-SYSTEM_PROMPT = """
-<|system|>
-You are a friendly, trauma-informed assistant. Analyze the user's message carefully for emotional content, intensity, and empathy needs.
+SYSTEM_PROMPT = """You are a friendly, trauma-informed assistant. Analyze the user's message carefully for emotional content, intensity, and empathy needs.
 
 When responding:
 1. First, analyze what the user is expressing (concern, emotion, intensity level 0-5)
 2. Then provide an empathetic response that matches their emotional needs
 3. Your response should reflect their experience, and feelings
-4. Keep responses to 1-2 sentences, lists, quotes, or clinical tone
+4. Keep responses to 1-2 sentences, avoid lists, quotes, or clinical tone
 
 Output EXACTLY this format:
 
@@ -22,17 +20,12 @@ Output EXACTLY this format:
 </reasoning>
 <answer>
 [Your empathetic response here - 1-2 sentences maximum]
-</answer>
-</s>
-""".strip()
+</answer>""".strip()
 
 
 def _mk_instruction(utterance: str) -> str:
-    """Format user text into Llama chat template structure."""
-    return (
-        "Here is the dialogue so far. Continue as <|assistant|>.\n\n"
-        f"<|user|>\n{utterance}\n</s>\n"
-    )
+    """Format user text - the chat template will handle special tokens."""
+    return utterance
 
 
 def load_wassa_empathy(split: Optional[str] = None) -> Dataset:
@@ -71,6 +64,11 @@ def load_wassa_empathy(split: Optional[str] = None) -> Dataset:
     ds = ds.map(_map)
     ds = ds.filter(lambda ex: ex["prompt"] is not None)
 
+    # Remove unused columns to save memory
+    cols_to_remove = [c for c in ds.column_names if c != "prompt"]
+    if cols_to_remove:
+        ds = ds.remove_columns(cols_to_remove)
+
     print(f"✅ Prepared {len(ds)} WASSA empathy examples for GRPO training.")
     print(
         "📝 Dataset structure: Each example contains prompt for model to generate empathetic response"
@@ -82,9 +80,7 @@ def load_wassa_empathy(split: Optional[str] = None) -> Dataset:
         ex = ds[i]
         print(f"\n--- Sample {i} ---")
         user_content = ex["prompt"][-1]["content"]
-        # Extract just the user message for cleaner display
-        user_text = user_content.split("<|user|>")[-1].split("</s>")[0].strip()
-        print(f"📱 User Input: '{user_text}'")
+        print(f"📱 User Input: '{user_content}'")
         print(
             "🤖 Model Task: Analyze emotion → Generate reasoning + empathetic response"
         )

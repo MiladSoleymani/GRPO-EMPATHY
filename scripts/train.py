@@ -118,7 +118,7 @@ def main():
     test_prompt = trainer.tokenizer.apply_chat_template(
         [
             {"role": "system", "content": get_system_prompt()},
-            {"role": "user", "content": f"Here is the dialogue so far. Continue as <|assistant|>.\n\n<|user|>\n{test_message}\n</s>\n"}
+            {"role": "user", "content": test_message}
         ],
         tokenize=False,
         add_generation_prompt=True,

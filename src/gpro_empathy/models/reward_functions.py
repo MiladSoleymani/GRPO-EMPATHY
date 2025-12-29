@@ -8,7 +8,14 @@ from transformers import AutoTokenizer, AutoModelForSequenceClassification
 _ANSWER_RE = re.compile(
     r"<answer>\s*(.*?)\s*</answer>", flags=re.DOTALL | re.IGNORECASE
 )
-_USER_SPAN_RE = re.compile(
+# Support multiple chat template formats:
+# - Llama 3.1: <|start_header_id|>user<|end_header_id|>\n\ncontent<|eot_id|>
+# - Legacy: <|user|>content</s>
+_USER_SPAN_RE_LLAMA31 = re.compile(
+    r"<\|start_header_id\|>user<\|end_header_id\|>\s*(.*?)\s*<\|eot_id\|>",
+    flags=re.DOTALL | re.IGNORECASE
+)
+_USER_SPAN_RE_LEGACY = re.compile(
     r"<\|user\|>\s*(.*?)\s*</s>", flags=re.DOTALL | re.IGNORECASE
 )
 
@@ -19,8 +26,13 @@ def _extract_text_between(s: str, pattern: re.Pattern, fallback: str = "") -> st
 
 
 def _extract_utterance_from_prompt(prompt_text: str) -> str:
-    """Pull just the user utterance from your chat template."""
-    text = _extract_text_between(prompt_text, _USER_SPAN_RE, fallback=prompt_text)
+    """Pull just the user utterance from chat template (supports multiple formats)."""
+    # Try Llama 3.1 format first
+    text = _extract_text_between(prompt_text, _USER_SPAN_RE_LLAMA31, fallback="")
+    if not text:
+        # Fall back to legacy format
+        text = _extract_text_between(prompt_text, _USER_SPAN_RE_LEGACY, fallback=prompt_text)
+    # Remove any remaining XML-like tags
     return re.sub(r"</?[^>]+>", "", text).strip()
 
 
@@ -113,23 +125,30 @@ class SemanticSimilarityReward:
         # print(f"📝 Extracted {len(replies)} answer texts")
 
         pairs = []
+        valid_mask = []
         for s, r in zip(sources, replies):
             s = (s or "").strip()
             r = (r or "").strip()
-            pairs.append((s if s else "x", r if r else "x"))
+            # Track if this pair has valid data
+            is_valid = bool(s) and bool(r)
+            valid_mask.append(is_valid)
+            # Use placeholder for empty strings (will be zeroed out)
+            pairs.append((s if s else "empty", r if r else "empty"))
 
-        # print("SemanticSimilarityReward: ", pairs)
         try:
             raw = np.array(self._ce.predict(pairs, batch_size=64), dtype=float)
-            # print(f"✅ Semantic reward computed: {len(raw)} scores for {len(pairs)} pairs")
         except Exception as e:
-            # print(f"⚠️ Semantic reward failed: {e}")
             raw = np.zeros(len(pairs), dtype=float)
 
         raw = np.nan_to_num(raw, nan=0.0, posinf=1.0, neginf=0.0)
         if raw.size and raw.max() > 1.25:
             raw = raw / 5.0
         raw = np.clip(raw, 0.0, 1.0)
+
+        # Zero out scores for invalid pairs (missing source or reply)
+        for i, is_valid in enumerate(valid_mask):
+            if not is_valid:
+                raw[i] = 0.0
 
         cal = _batch_calibrate(raw, temperature=0.6)
         return cal.tolist()
@@ -189,19 +208,24 @@ class EmpathyModelReward:
         return np.clip(cal, 0.0, 1.0).tolist()
 
 
+# Singleton instances to avoid recreating models on every call
+_semantic_reward_instance = None
+_empathy_reward_instance = None
+
+
 def semantic_sts_reward(prompts, completions, **kwargs) -> list[float]:
     """Convenience function for semantic similarity reward."""
-    # print(f"🔍 Semantic reward called with {len(prompts)} prompts, {len(completions)} completions")
-    reward_fn = SemanticSimilarityReward()
-    results = reward_fn(prompts, completions, **kwargs)
-    # print(f"🎯 Semantic reward returned {len(results)} scores")
+    global _semantic_reward_instance
+    if _semantic_reward_instance is None:
+        _semantic_reward_instance = SemanticSimilarityReward()
+    results = _semantic_reward_instance(prompts, completions, **kwargs)
     return results
 
 
 def empathy_model_reward(prompts=None, completions=None, **kwargs) -> list[float]:
     """Convenience function for empathy model reward."""
-    # print(f"🔍 Empathy reward called with {len(prompts or [])} prompts, {len(completions or [])} completions")
-    reward_fn = EmpathyModelReward()
-    results = reward_fn(prompts, completions, **kwargs)
-    # print(f"💝 Empathy reward returned {len(results)} scores")
+    global _empathy_reward_instance
+    if _empathy_reward_instance is None:
+        _empathy_reward_instance = EmpathyModelReward()
+    results = _empathy_reward_instance(prompts, completions, **kwargs)
     return results
