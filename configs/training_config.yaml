@@ -1,6 +1,9 @@
 # GPRO Empathy Training Configuration
 
 model:
+  # Available options:
+  #   - "meta-llama/meta-Llama-3.1-8B-Instruct" (default)
+  #   - "deepseek-ai/DeepSeek-R1-Distill-Llama-8B" (recommended for reasoning)
   name: "meta-llama/meta-Llama-3.1-8B-Instruct"
   max_seq_length: 1024
   lora_rank: 32
