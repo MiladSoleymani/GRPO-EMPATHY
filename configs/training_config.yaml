@@ -1,5 +1,10 @@
 # GPRO Empathy Training Configuration
 
+# Trainer type: "grpo" or "rloo"
+# - grpo: Group Relative Policy Optimization (default)
+# - rloo: REINFORCE Leave-One-Out (more sample-efficient baseline)
+trainer_type: "grpo"
+
 model:
   # Available options:
   #   - "meta-llama/meta-Llama-3.1-8B-Instruct" (default)
@@ -28,6 +33,11 @@ training:
   max_grad_norm: 0.1
   output_dir: "outputs"
   max_prompt_length: 512
+
+# RLOO-specific parameters (only used when trainer_type: "rloo")
+rloo:
+  beta: 0.04          # KL penalty coefficient
+  epsilon: 0.2        # Clipping parameter for importance sampling
 
 inference:
   temperature: 0.8

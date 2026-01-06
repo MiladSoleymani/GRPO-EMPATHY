@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 """
-Main training script for GRPO Empathy model.
+Main training script for GRPO/RLOO Empathy model.
+
+Supports two training algorithms:
+- GRPO: Group Relative Policy Optimization
+- RLOO: REINFORCE Leave-One-Out (more sample-efficient baseline)
 """
 import argparse
 import yaml
@@ -12,6 +16,7 @@ import sys
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from gpro_empathy.training.grpo_trainer import GPROEmpathyTrainer
+from gpro_empathy.training.rloo_trainer import RLOOEmpathyTrainer
 from gpro_empathy.utils.plotting import plot_from_output_dir, plot_reward_distribution, extract_metrics, load_training_logs
 
 
@@ -22,12 +27,18 @@ def load_config(config_path: str) -> dict:
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Train GPRO Empathy model")
+    parser = argparse.ArgumentParser(description="Train GRPO/RLOO Empathy model")
     parser.add_argument(
-        "--config", 
-        type=str, 
+        "--config",
+        type=str,
         default="configs/training_config.yaml",
         help="Path to training configuration file"
+    )
+    parser.add_argument(
+        "--trainer-type",
+        type=str,
+        choices=["grpo", "rloo"],
+        help="Training algorithm: 'grpo' (Group Relative Policy Optimization) or 'rloo' (REINFORCE Leave-One-Out)"
     )
     parser.add_argument(
         "--output-dir",
@@ -57,29 +68,39 @@ def main():
     )
 
     args = parser.parse_args()
-    
+
     # Load configuration
     config = load_config(args.config)
-    
+
     # Override config values with command line arguments
+    if args.trainer_type:
+        config['trainer_type'] = args.trainer_type
     if args.output_dir:
         config['training']['output_dir'] = args.output_dir
     if args.max_steps:
         config['training']['max_steps'] = args.max_steps
     if args.save_steps:
         config['training']['save_steps'] = args.save_steps
-    
+
+    # Get trainer type (default to grpo for backward compatibility)
+    trainer_type = config.get('trainer_type', 'grpo').lower()
+    if trainer_type not in ['grpo', 'rloo']:
+        raise ValueError(f"Invalid trainer_type: {trainer_type}. Must be 'grpo' or 'rloo'")
+
     # Create output directory
     os.makedirs(config['training']['output_dir'], exist_ok=True)
-    
-    print("=== GPRO Empathy Training ===")
+
+    print(f"=== {trainer_type.upper()} Empathy Training ===")
+    print(f"Trainer: {trainer_type.upper()}")
     print(f"Model: {config['model']['name']}")
     print(f"Max steps: {config['training']['max_steps']}")
     print(f"Output dir: {config['training']['output_dir']}")
     print(f"LoRA rank: {config['model']['lora_rank']}")
-    
-    # Initialize trainer
-    trainer = GPROEmpathyTrainer(
+
+    # Initialize trainer based on trainer_type
+    TrainerClass = RLOOEmpathyTrainer if trainer_type == 'rloo' else GPROEmpathyTrainer
+
+    trainer = TrainerClass(
         model_name=config['model']['name'],
         max_seq_length=config['model']['max_seq_length'],
         lora_rank=config['model']['lora_rank'],
@@ -87,9 +108,9 @@ def main():
         fast_inference=config['model']['fast_inference'],
         gpu_memory_utilization=config['model']['gpu_memory_utilization'],
     )
-    
-    # Setup training
-    trainer.setup_training(
+
+    # Build training kwargs
+    training_kwargs = dict(
         learning_rate=config['training']['learning_rate'],
         adam_beta1=config['training']['adam_beta1'],
         adam_beta2=config['training']['adam_beta2'],
@@ -107,6 +128,17 @@ def main():
         output_dir=config['training']['output_dir'],
         max_prompt_length=config['training']['max_prompt_length'],
     )
+
+    # Add RLOO-specific parameters if using RLOO
+    if trainer_type == 'rloo' and 'rloo' in config:
+        rloo_config = config['rloo']
+        training_kwargs['beta'] = rloo_config.get('beta', 0.04)
+        training_kwargs['epsilon'] = rloo_config.get('epsilon', 0.2)
+        print(f"RLOO beta (KL penalty): {training_kwargs['beta']}")
+        print(f"RLOO epsilon (clip): {training_kwargs['epsilon']}")
+
+    # Setup training
+    trainer.setup_training(**training_kwargs)
     
     print("\n=== Starting Training ===")
     # Start training
