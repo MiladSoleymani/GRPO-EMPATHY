@@ -100,12 +100,18 @@ def main():
     # Initialize trainer based on trainer_type
     TrainerClass = RLOOEmpathyTrainer if trainer_type == 'rloo' else GPROEmpathyTrainer
 
+    # RLOO has a known bug with vLLM LoRA merging - disable fast_inference for RLOO
+    use_fast_inference = config['model']['fast_inference']
+    if trainer_type == 'rloo' and use_fast_inference:
+        print("WARNING: Disabling fast_inference for RLOO (known vLLM LoRA merge bug)")
+        use_fast_inference = False
+
     trainer = TrainerClass(
         model_name=config['model']['name'],
         max_seq_length=config['model']['max_seq_length'],
         lora_rank=config['model']['lora_rank'],
         load_in_4bit=config['model']['load_in_4bit'],
-        fast_inference=config['model']['fast_inference'],
+        fast_inference=use_fast_inference,
         gpu_memory_utilization=config['model']['gpu_memory_utilization'],
     )
 
